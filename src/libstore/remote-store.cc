@@ -476,6 +476,7 @@ Path RemoteStore::addTextToStore(const string & name, const string & s,
 void RemoteStore::buildPaths(const PathSet & drvPaths, BuildMode buildMode)
 {
     auto conn(connections->get());
+    setOptions(*conn);
     conn->to << wopBuildPaths;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13) {
         conn->to << drvPaths;
@@ -503,6 +504,7 @@ BuildResult RemoteStore::buildDerivation(const Path & drvPath, const BasicDeriva
     BuildMode buildMode)
 {
     auto conn(connections->get());
+    setOptions(*conn);
     conn->to << wopBuildDerivation << drvPath << drv << buildMode;
     conn->processStderr();
     BuildResult res;

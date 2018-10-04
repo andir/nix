@@ -30,6 +30,17 @@ let
         outputs = [ "out" "foo" ];
       }
     '';
+  exprSlow = config: seconds: pkgs.writeText "expr-${toString seconds}s.nix"
+    ''
+      let utils = builtins.storePath ${config.system.build.extraUtils}; in
+      derivation {
+        name = "slow-${toString seconds}";
+        system = "i686-linux";
+        PATH = "''${utils}/bin";
+        builder = "''${utils}/bin/sh";
+        args = [ "-c" "sleep ${toString seconds}; touch $out" ];
+      }
+    '';
 
 in
 
@@ -99,6 +110,10 @@ in
 
       # And a failing build.
       $client->fail("nix-build ${expr nodes.client.config 5}");
+
+      # Verify that the timeout works
+      $client->fail("nix-build --timeout 10 ${exprSlow nodes.client.config 60}");
+      $client->succeed("nix-build --timeout 60 ${exprSlow nodes.client.config 1}");
 
       # Test whether the build hook automatically skips unavailable builders.
       $builder1->block;
