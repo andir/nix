@@ -139,6 +139,8 @@ public:
 
     Path queryPathFromHashPart(const string & hashPart) override;
 
+    Path queryPathFromNarHash(const string & narHash) override;
+
     PathSet querySubstitutablePaths(const PathSet & paths) override;
 
     void querySubstitutablePathInfos(const PathSet & paths,

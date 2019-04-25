@@ -392,6 +392,10 @@ public:
        path, or "" if the path doesn't exist. */
     virtual Path queryPathFromHashPart(const string & hashPart) = 0;
 
+    /* Query the full store path given the has of a cached NAR file,
+     * or "" if the path doesn't exist. */
+    virtual Path queryPathFromNarHash(const string & narHash) = 0;
+
     /* Query which of the given paths have substitutes. */
     virtual PathSet querySubstitutablePaths(const PathSet & paths) { return {}; };
 

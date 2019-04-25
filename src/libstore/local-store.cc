@@ -5,6 +5,7 @@
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
+#include "nar-info-disk-cache.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -238,6 +239,7 @@ LocalStore::LocalStore(const Params & params)
     state->stmtQueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
     state->stmtQueryValidPaths.create(state->db, "select path from ValidPaths");
+
 }
 
 
@@ -829,6 +831,13 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
         const char * s = (const char *) sqlite3_column_text(state->stmtQueryPathFromHashPart, 0);
         return s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0 ? s : "";
     });
+}
+
+Path LocalStore::queryPathFromNarHash(const string & narHash)
+{
+//    auto diskCache = ;
+//    if (diskCache == nullptr) return "";
+    return getNarInfoDiskCache()->queryPathFromNarHash(narHash);
 }
 
 
