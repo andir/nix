@@ -835,8 +835,8 @@ Path LocalStore::queryPathFromHashPart(const string & hashPart)
 
 Path LocalStore::queryPathFromNarHash(const string & narHash)
 {
-//    auto diskCache = ;
-//    if (diskCache == nullptr) return "";
+    // FIXME: can not initialize `diskCache` in the constructor as that seems
+    // to cause some kind of runtime error that I haven't investigated yet.
     return getNarInfoDiskCache()->queryPathFromNarHash(narHash);
 }
 
