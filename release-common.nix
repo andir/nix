@@ -71,7 +71,8 @@ rec {
           sha256 = "1pij0v449p166f9l29x7ppzk8j7g9k9mp15ilh5qxp29c7fnvxy2";
         }) ];
         */
-      }));
+      }))
+    ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) google-cloud-cpp;
 
   propagatedDeps =
     [ (boehmgc.override { enableLargeConfig = true; })
