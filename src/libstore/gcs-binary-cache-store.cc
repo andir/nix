@@ -93,16 +93,32 @@ struct GCSBinaryCacheStoreImpl : public GCSBinaryCacheStore
     {
         const auto size = data.size();
         const auto now1 = std::chrono::steady_clock::now();
-        const auto metadata = client->InsertObject(
-                bucketName, path, std::move(data),
-                gcs::WithObjectMetadata(
-                    gcs::ObjectMetadata()
-                        .set_content_type(mimeType)
-                        .set_content_encoding(contentEncoding)
-                ));
 
-        if (!metadata) {
-            throw Error(format("GCS error uploading '%s': %s") % path % metadata.status().message());
+        if (size < bufferSize) {
+
+            const auto metadata = client->InsertObject(
+                    bucketName, path, std::move(data),
+                    gcs::WithObjectMetadata(
+                        gcs::ObjectMetadata()
+                            .set_content_type(mimeType)
+                            .set_content_encoding(contentEncoding)
+                    ));
+            if (!metadata) {
+                throw Error(format("GCS error uploading '%s': %s") % path % metadata.status().message());
+            }
+
+        } else {
+            auto stream = client->WriteObject(bucketName, path);
+            for (size_t n = 0; n < size; n += bufferSize) {
+                const auto slice = data.substr(n, bufferSize);
+                stream << slice;
+            }
+            stream.Close();
+
+            const auto metadata = std::move(stream).metadata();
+            if (!metadata) {
+                throw Error(format("GCS error uploading '%s': %s") % path % metadata.status().message());
+            }
         }
 
         const auto now2 = std::chrono::steady_clock::now();
