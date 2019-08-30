@@ -94,6 +94,7 @@ struct GCSBinaryCacheStore : public BinaryCacheStore
         const auto size = data.size();
         const auto now1 = std::chrono::steady_clock::now();
 
+#if 0
         if (size < bufferSize) {
 
             const auto metadata = client->InsertObject(
@@ -107,7 +108,9 @@ struct GCSBinaryCacheStore : public BinaryCacheStore
                 throw Error(format("GCS error uploading '%s': %s") % path % metadata.status().message());
             }
 
-        } else {
+        } else
+#endif
+{
             auto stream = client->WriteObject(bucketName, path);
             for (size_t n = 0; n < size; n += bufferSize) {
                 const auto slice = data.substr(n, bufferSize);
