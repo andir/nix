@@ -1,10 +1,9 @@
 #if ENABLE_GCS
-
 #include "nar-info.hh"
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
 #include "compression.hh"
-#include "gcs-binary-cache-store.hh"
+#include "binary-cache-store.hh"
 
 #include <memory>
 #include <google/cloud/storage/client.h>
@@ -16,7 +15,7 @@ using ::google::cloud::StatusOr;
 
 namespace nix {
 
-struct GCSBinaryCacheStoreImpl : public GCSBinaryCacheStore
+struct GCSBinaryCacheStoreImpl : public BinaryCacheStore
 {
     const Setting<std::string> narinfoCompression{this, "", "narinfo-compression", "compression method for .narinfo files"};
     const Setting<std::string> lsCompression{this, "", "ls-compression", "compression method for .ls files"};
@@ -29,7 +28,7 @@ struct GCSBinaryCacheStoreImpl : public GCSBinaryCacheStore
 
     GCSBinaryCacheStoreImpl(
             const Params & params, const std::string & bucketName)
-        : GCSBinaryCacheStore(params)
+        : BinaryCacheStore(params)
         , bucketName(bucketName)
         , client(nullptr)
     {
@@ -54,15 +53,15 @@ struct GCSBinaryCacheStoreImpl : public GCSBinaryCacheStore
             client = std::make_unique<gcs::Client>(*options);
         }
 
-        if (!diskCache->cacheExists(getUri(), wantMassQuery_, priority)) {
+        if (!diskCache->cacheExists(getUri())) {
 
             BinaryCacheStore::init();
 
-            diskCache->createCache(getUri(), storeDir, wantMassQuery_, priority);
+            diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
         }
     }
 
-    bool isValidPathUncached(const Path & storePath) override
+    bool isValidPathUncached(const StorePath & storePath) override
     {
         try {
             queryPathInfo(storePath);
@@ -170,9 +169,9 @@ struct GCSBinaryCacheStoreImpl : public GCSBinaryCacheStore
                 bucketName, path, bytes, duration);
     }
 
-    PathSet queryAllValidPaths() override
+    StorePathSet queryAllValidPaths() override
     {
-        PathSet paths;
+        StorePathSet paths;
 
         // FIXME: is this really needed for binary caches?
         return paths;
