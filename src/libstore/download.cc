@@ -641,6 +641,23 @@ struct CurlDownloader : public Downloader
     }
 #endif
 
+#ifdef ENABLE_GCS
+    std::tuple<std::string, std::string, Store::Params> parseGCSUri(std::string uri)
+    {
+        auto [path, params] = splitUriAndParams(uri);
+
+        auto slash = path.find('/', 5); // 5 is the length of "s3://" prefix
+            if (slash == std::string::npos)
+                throw nix::Error("bad GCS URI '%s'", path);
+
+        std::string bucketName(path, 5, slash - 5);
+        std::string key(path, slash + 1);
+
+        return {bucketName, key, params};
+    }
+#endif
+
+
     void enqueueDownload(const DownloadRequest & request,
         Callback<DownloadResult> callback) override
     {
@@ -665,6 +682,49 @@ struct CurlDownloader : public Downloader
                     throw DownloadError(NotFound, fmt("S3 object '%s' does not exist", request.uri));
                 res.data = s3Res.data;
                 callback(std::move(res));
+#else
+                throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
+#endif
+            } catch (...) { callback.rethrow(); }
+            return;
+        }
+
+        /* Ugly hack to support gs:// URIs. */
+        if (hasPrefix(request.uri, "gs://")) {
+            // FIXME: do this on a worker thread
+            try {
+#ifdef ENABLE_S3
+                auto [bucketName, key, params] = parseGCSUri(request.uri);
+
+                StatusOr<gcs::ClientOptions> options =
+                    gcs::ClientOptions::CreateDefaultClientOptions();
+
+                if (!options) {
+                    throw Error("Failed to retrieve GCS credentials");
+                }
+
+                gcs::Client gcsClient(*options);
+
+                auto stream = gcsClient->ReadObject(bucketName, key);
+
+                if (stream.bad())
+                    throw DownloadError(NotFound, fmt("GCS object '%s' does not exist", request.uri));
+
+                std::vector<char> buffer(4096, 0);
+                size_t bytes = 0;
+
+                while (stream.good()) {
+                    stream.read(buffer.data(), buffer.size());
+                    const auto n = stream.gcount();
+                    if (stream.bad()) {
+                        throw Error(format("error while dowloading '%s' from binary cache '%s': %s") % path % getUri() % stream.status().message());
+                    }
+
+                    sink((unsigned char*)buffer.data(), n);
+                    bytes += n;
+                }
+
+                callback(std::move(buffer.data()));
 #else
                 throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
 #endif
