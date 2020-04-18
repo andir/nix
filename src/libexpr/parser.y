@@ -542,6 +542,7 @@ formal
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <regex>
 
 #include "eval.hh"
 #include "filetransfer.hh"
@@ -678,15 +679,18 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
     throw ThrownError(f % path % pos);
 }
 
-
 std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
 {
+
+    // RFC3986 protocol part of the URI regex
+    static std::regex hasSchemePrefixRegex("^([^:/?#]+):.+$");
+
     auto i = searchPathResolved.find(elem.second);
     if (i != searchPathResolved.end()) return i->second;
 
     std::pair<bool, std::string> res;
 
-    if (isUri(elem.second)) {
+    if (std::regex_match(elem.second, hasSchemePrefixRegex)) {
         try {
             res = { true, store->toRealPath(fetchers::downloadTarball(
                         store, resolveUri(elem.second), "source", false).storePath) };
