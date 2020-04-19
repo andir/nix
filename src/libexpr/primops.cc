@@ -1147,9 +1147,6 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
     size_t n = 0;
     for (auto & i : *args[0]->attrs)
         mkString(*(v.listElems()[n++] = state.allocValue()), i.second.name);
-
-    std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
 }
 
 
