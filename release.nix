@@ -115,12 +115,14 @@ let
 
         installFlags = "sysconfdir=$(out)/etc";
 
-        doCheck = true;
+        doCheck = false;
+        dontStrip = true;
+        doStrip = false;
 
-        doInstallCheck = true;
+        doInstallCheck = false;
         installCheckFlags = "sysconfdir=$(out)/etc";
 
-        separateDebugInfo = true;
+        #separateDebugInfo = true;
 
         preDist = ''
           mkdir -p $doc/nix-support

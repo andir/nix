@@ -1,6 +1,7 @@
 #pragma once
 
 #include "symbol-table.hh"
+#include "bindings.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -30,7 +31,6 @@ typedef enum {
 } ValueType;
 
 
-class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;

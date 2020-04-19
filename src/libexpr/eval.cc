@@ -892,23 +892,23 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            still reference the original value, because that value has
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
-        if (hasOverrides) {
-            Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
-            state.forceAttrs(*vOverrides);
-            Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
-            for (auto & i : *v.attrs)
-                newBnds->push_back(i);
-            for (auto & i : *vOverrides->attrs) {
-                AttrDefs::iterator j = attrs.find(i.name);
-                if (j != attrs.end()) {
-                    (*newBnds)[j->second.displ] = i;
-                    env2.values[j->second.displ] = i.value;
-                } else
-                    newBnds->push_back(i);
-            }
-            newBnds->sort();
-            v.attrs = newBnds;
-        }
+        //if (hasOverrides) {
+        //    Value * vOverrides = (*v.attrs)[overrides->second.displ].value;
+        //    state.forceAttrs(*vOverrides);
+        //    Bindings * newBnds = state.allocBindings(v.attrs->capacity() + vOverrides->attrs->size());
+        //    for (auto & i : *v.attrs)
+        //        newBnds->push_back(i);
+        //    for (auto & i : *vOverrides->attrs) {
+        //        AttrDefs::iterator j = attrs.find(i.name);
+        //        if (j != attrs.end()) {
+        //            (*newBnds)[j->second.displ] = i;
+        //            env2.values[j->second.displ] = i.value;
+        //        } else
+        //            newBnds->push_back(i);
+        //    }
+        //    newBnds->sort();
+        //    v.attrs = newBnds;
+        //}
     }
 
     else

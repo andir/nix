@@ -1,12 +1,12 @@
 #pragma once
 
 #include "args.hh"
+#include "attr-set.hh"
 
 namespace nix {
 
 class Store;
 class EvalState;
-class Bindings;
 
 struct MixEvalArgs : virtual Args
 {
