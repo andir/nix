@@ -98,9 +98,9 @@ static void printValue(std::ostream & str, std::set<const Value *> & active, con
         break;
     case tAttrs: {
         str << "{ ";
-        for (auto & i : v.attrs->lexicographicOrder()) {
-            str << i->name << " = ";
-            printValue(str, active, *i->value);
+        for (auto & i : *v.attrs) {
+            str << i.second.name << " = ";
+            printValue(str, active, *i.second.value);
             str << "; ";
         }
         str << "}";
@@ -463,7 +463,8 @@ Value * EvalState::addConstant(const string & name, Value & v)
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v2;
     string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    auto symbol = symbols.create(name2);
+    baseEnv.values[0]->attrs->emplace(symbol, Attr(symbol, v2));
     return v2;
 }
 
@@ -483,14 +484,14 @@ Value * EvalState::addPrimOp(const string & name,
     v->primOp = new PrimOp(primOp, arity, sym);
     staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
     baseEnv.values[baseEnvDispl++] = v;
-    baseEnv.values[0]->attrs->push_back(Attr(sym, v));
+    baseEnv.values[0]->attrs->emplace(sym, Attr(sym, v));
     return v;
 }
 
 
 Value & EvalState::getBuiltin(const string & name)
 {
-    return *baseEnv.values[0]->attrs->find(symbols.create(name))->value;
+    return *baseEnv.values[0]->attrs->find(symbols.create(name))->second.value;
 }
 
 
@@ -610,8 +611,8 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
         }
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
-            if (countCalls && j->pos) attrSelects[*j->pos]++;
-            return j->value;
+            if (countCalls && j->second.pos) attrSelects[*j->second.pos]++;
+            return j->second.value;
         }
         if (!env->prevWith)
             throwUndefinedVarError("undefined variable '%1%' at %2%", var.name, var.pos);
@@ -689,7 +690,6 @@ void EvalState::mkPos(Value & v, Pos * pos)
         mkString(*allocAttr(v, sFile), pos->file);
         mkInt(*allocAttr(v, sLine), pos->line);
         mkInt(*allocAttr(v, sColumn), pos->column);
-        v.attrs->sort();
     } else
         mkNull(v);
 }
@@ -881,7 +881,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             } else
                 vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
             env2.values[displ++] = vAttr;
-            v.attrs->push_back(Attr(i.first, vAttr, &i.second.pos));
+            v.attrs->emplace(i.first, Attr(i.first, vAttr, &i.second.pos));
         }
 
         /* If the rec contains an attribute called `__overrides', then
@@ -913,7 +913,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
     else
         for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
+            v.attrs->emplace(i.first, Attr(i.first, i.second.e->maybeThunk(state, env), &i.second.pos));
 
     /* Dynamic attrs apply *after* rec and __overrides. */
     for (auto & i : dynamicAttrs) {
@@ -926,12 +926,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Symbol nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->pos);
+            throwEvalError("dynamic attribute '%1%' at %2% already defined at %3%", nameSym, i.pos, *j->second.pos);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
-        v.attrs->push_back(Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
-        v.attrs->sort(); // FIXME: inefficient
+        v.attrs->emplace(nameSym, Attr(nameSym, i.valueExpr->maybeThunk(state, *dynamicEnv), &i.pos));
     }
 }
 
@@ -1016,8 +1015,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
                     throwEvalError("attribute '%1%' missing, at %2%", name, pos);
             }
-            vAttrs = j->value;
-            pos2 = j->pos;
+            vAttrs = j->second.value;
+            pos2 = j->second.pos;
             if (state.countCalls && pos2) state.attrSelects[*pos2]++;
         }
 
@@ -1051,7 +1050,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
             mkBool(v, false);
             return;
         } else {
-            vAttrs = j->value;
+            vAttrs = j->second.value;
         }
     }
 
@@ -1134,7 +1133,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
         fun2 = fun;
         /* !!! Should we use the attr pos here? */
         Value v2;
-        callFunction(*found->value, fun2, v2, pos);
+        callFunction(*found->second.value, fun2, v2, pos);
         return callFunction(v2, arg, v, pos);
       }
     }
@@ -1173,7 +1172,7 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
                 env2.values[displ++] = i.def->maybeThunk(*this, env2);
             } else {
                 attrsUsed++;
-                env2.values[displ++] = j->value;
+                env2.values[displ++] = j->second.value;
             }
         }
 
@@ -1183,8 +1182,8 @@ void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & po
             /* Nope, so show the first unexpected argument to the
                user. */
             for (auto & i : *arg.attrs)
-                if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError("%1% called with unexpected argument '%2%', at %3%", lambda, i.name, pos);
+                if (lambda.formals->argNames.find(i.second.name) == lambda.formals->argNames.end())
+                    throwTypeError("%1% called with unexpected argument '%2%', at %3%", lambda, i.second.name, pos);
             abort(); // can't happen
         }
     }
@@ -1222,7 +1221,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
         auto found = fun.attrs->find(sFunctor);
         if (found != fun.attrs->end()) {
             Value * v = allocValue();
-            callFunction(*found->value, fun, *v, noPos);
+            callFunction(*found->second.value, fun, *v, noPos);
             forceValue(*v);
             return autoCallFunction(args, *v, res);
         }
@@ -1239,12 +1238,10 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
     for (auto & i : fun.lambda.fun->formals->formals) {
         Bindings::iterator j = args.find(i.name);
         if (j != args.end())
-            actualArgs->attrs->push_back(*j);
+            actualArgs->attrs->insert(*j);
         else if (!i.def)
             throwTypeError("cannot auto-call a function that has an argument without a default value ('%1%')", i.name);
     }
-
-    actualArgs->attrs->sort();
 
     callFunction(fun, *actualArgs, res, noPos);
 }
@@ -1338,18 +1335,18 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     Bindings::iterator j = v2.attrs->begin();
 
     while (i != v1.attrs->end() && j != v2.attrs->end()) {
-        if (i->name == j->name) {
-            v.attrs->push_back(*j);
+        if (i->second.name == j->second.name) {
+            v.attrs->insert(*j);
             ++i; ++j;
         }
-        else if (i->name < j->name)
-            v.attrs->push_back(*i++);
+        else if (i->second.name < j->second.name)
+            v.attrs->insert(*i++);
         else
-            v.attrs->push_back(*j++);
+            v.attrs->insert(*j++);
     }
 
-    while (i != v1.attrs->end()) v.attrs->push_back(*i++);
-    while (j != v2.attrs->end()) v.attrs->push_back(*j++);
+    while (i != v1.attrs->end()) v.attrs->insert(*i++);
+    while (j != v2.attrs->end()) v.attrs->insert(*j++);
 
     state.nrOpUpdateValuesCopied += v.attrs->size();
 }
@@ -1471,9 +1468,9 @@ void EvalState::forceValueDeep(Value & v)
         if (v.type == tAttrs) {
             for (auto & i : *v.attrs)
                 try {
-                    recurse(*i.value);
+                    recurse(*i.second.value);
                 } catch (Error & e) {
-                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.name, *i.pos);
+                    addErrorPrefix(e, "while evaluating the attribute '%1%' at %2%:\n", i.second.name, *i.second.pos);
                     throw;
                 }
         }
@@ -1580,9 +1577,9 @@ bool EvalState::isDerivation(Value & v)
     if (v.type != tAttrs) return false;
     Bindings::iterator i = v.attrs->find(sType);
     if (i == v.attrs->end()) return false;
-    forceValue(*i->value);
-    if (i->value->type != tString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    forceValue(*i->second.value);
+    if (i->second.value->type != tString) return false;
+    return strcmp(i->second.value->string.s, "derivation") == 0;
 }
 
 
@@ -1592,7 +1589,7 @@ std::optional<string> EvalState::tryAttrsToString(const Pos & pos, Value & v,
     auto i = v.attrs->find(sToString);
     if (i != v.attrs->end()) {
         Value v1;
-        callFunction(*i->value, v, v1, pos);
+        callFunction(*i->second.value, v, v1, pos);
         return coerceToString(pos, v1, context, coerceMore, copyToStore);
     }
 
@@ -1623,7 +1620,7 @@ string EvalState::coerceToString(const Pos & pos, Value & v, PathSet & context,
         }
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) throwTypeError("cannot coerce a set to a string, at %1%", pos);
-        return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
+        return coerceToString(pos, *i->second.value, context, coerceMore, copyToStore);
     }
 
     if (v.type == tExternal)
@@ -1740,7 +1737,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
                 Bindings::iterator i = v1.attrs->find(sOutPath);
                 Bindings::iterator j = v2.attrs->find(sOutPath);
                 if (i != v1.attrs->end() && j != v2.attrs->end())
-                    return eqValues(*i->value, *j->value);
+                    return eqValues(*i->second.value, *j->second.value);
             }
 
             if (v1.attrs->size() != v2.attrs->size()) return false;
@@ -1748,7 +1745,7 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             /* Otherwise, compare the attributes one by one. */
             Bindings::iterator i, j;
             for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
-                if (i->name != j->name || !eqValues(*i->value, *j->value))
+                if (i->second.name != j->second.name || !eqValues(*i->second.value, *j->second.value))
                     return false;
 
             return true;

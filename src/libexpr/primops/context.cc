@@ -122,9 +122,7 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
                 mkString(*(outputsVal.listElems()[i++] = state.allocValue()), output);
             }
         }
-        infoVal.attrs->sort();
     }
-    v.attrs->sort();
 }
 
 static RegisterPrimOp r4("__getContext", 1, prim_getContext);
@@ -145,36 +143,36 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
     for (auto & i : *args[1]->attrs) {
-        if (!state.store->isStorePath(i.name))
-            throw EvalError("Context key '%s' is not a store path, at %s", i.name, i.pos);
+        if (!state.store->isStorePath(i.second.name))
+            throw EvalError("Context key '%s' is not a store path, at %s", i.second.name, i.second.pos);
         if (!settings.readOnlyMode)
-            state.store->ensurePath(state.store->parseStorePath(i.name));
-        state.forceAttrs(*i.value, *i.pos);
-        auto iter = i.value->attrs->find(sPath);
-        if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, *iter->pos))
-                context.insert(i.name);
+            state.store->ensurePath(state.store->parseStorePath(i.second.name));
+        state.forceAttrs(*i.second.value, *i.second.pos);
+        auto iter = i.second.value->attrs->find(sPath);
+        if (iter != i.second.value->attrs->end()) {
+            if (state.forceBool(*iter->second.value, *iter->second.pos))
+                context.insert(i.second.name);
         }
 
-        iter = i.value->attrs->find(sAllOutputs);
-        if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, *iter->pos)) {
-                if (!isDerivation(i.name)) {
-                    throw EvalError("Tried to add all-outputs context of %s, which is not a derivation, to a string, at %s", i.name, i.pos);
+        iter = i.second.value->attrs->find(sAllOutputs);
+        if (iter != i.second.value->attrs->end()) {
+            if (state.forceBool(*iter->second.value, *iter->second.pos)) {
+                if (!isDerivation(i.second.name)) {
+                    throw EvalError("Tried to add all-outputs context of %s, which is not a derivation, to a string, at %s", i.second.name, i.second.pos);
                 }
-                context.insert("=" + string(i.name));
+                context.insert("=" + string(i.second.name));
             }
         }
 
-        iter = i.value->attrs->find(state.sOutputs);
-        if (iter != i.value->attrs->end()) {
-            state.forceList(*iter->value, *iter->pos);
-            if (iter->value->listSize() && !isDerivation(i.name)) {
-                throw EvalError("Tried to add derivation output context of %s, which is not a derivation, to a string, at %s", i.name, i.pos);
+        iter = i.second.value->attrs->find(state.sOutputs);
+        if (iter != i.second.value->attrs->end()) {
+            state.forceList(*iter->second.value, *iter->second.pos);
+            if (iter->second.value->listSize() && !isDerivation(i.second.name)) {
+                throw EvalError("Tried to add derivation output context of %s, which is not a derivation, to a string, at %s", i.second.name, i.second.pos);
             }
-            for (unsigned int n = 0; n < iter->value->listSize(); ++n) {
-                auto name = state.forceStringNoCtx(*iter->value->listElems()[n], *iter->pos);
-                context.insert("!" + name + "!" + string(i.name));
+            for (unsigned int n = 0; n < iter->second.value->listSize(); ++n) {
+                auto name = state.forceStringNoCtx(*iter->second.value->listElems()[n], *iter->second.pos);
+                context.insert("!" + name + "!" + string(i.second.name));
             }
         }
     }

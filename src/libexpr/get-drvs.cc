@@ -48,7 +48,7 @@ string DrvInfo::queryName() const
     if (name == "" && attrs) {
         auto i = attrs->find(state->sName);
         if (i == attrs->end()) throw TypeError("derivation name missing");
-        name = state->forceStringNoCtx(*i->value);
+        name = state->forceStringNoCtx(*i->second.value);
     }
     return name;
 }
@@ -58,7 +58,7 @@ string DrvInfo::querySystem() const
 {
     if (system == "" && attrs) {
         auto i = attrs->find(state->sSystem);
-        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, *i->pos);
+        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->second.value, *i->second.pos);
     }
     return system;
 }
@@ -69,7 +69,7 @@ string DrvInfo::queryDrvPath() const
     if (drvPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
         PathSet context;
-        drvPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
+        drvPath = i != attrs->end() ? state->coerceToPath(*i->second.pos, *i->second.value, context) : "";
     }
     return drvPath;
 }
@@ -80,7 +80,7 @@ string DrvInfo::queryOutPath() const
     if (outPath == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
         PathSet context;
-        outPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
+        outPath = i != attrs->end() ? state->coerceToPath(*i->second.pos, *i->second.value, context) : "";
     }
     return outPath;
 }
@@ -92,21 +92,21 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
         /* Get the ‘outputs’ list. */
         Bindings::iterator i;
         if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
-            state->forceList(*i->value, *i->pos);
+            state->forceList(*i->second.value, *i->second.pos);
 
             /* For each output... */
-            for (unsigned int j = 0; j < i->value->listSize(); ++j) {
+            for (unsigned int j = 0; j < i->second.value->listSize(); ++j) {
                 /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*i->value->listElems()[j], *i->pos);
+                string name = state->forceStringNoCtx(*i->second.value->listElems()[j], *i->second.pos);
                 Bindings::iterator out = attrs->find(state->symbols.create(name));
                 if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value);
+                state->forceAttrs(*out->second.value);
 
                 /* And evaluate its ‘outPath’ attribute. */
-                Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
-                if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
+                Bindings::iterator outPath = out->second.value->attrs->find(state->sOutPath);
+                if (outPath == out->second.value->attrs->end()) continue; // FIXME: throw error?
                 PathSet context;
-                outputs[name] = state->coerceToPath(*outPath->pos, *outPath->value, context);
+                outputs[name] = state->coerceToPath(*outPath->second.pos, *outPath->second.value, context);
             }
         } else
             outputs["out"] = queryOutPath();
@@ -135,7 +135,7 @@ string DrvInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutputName);
-        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value) : "";
+        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->second.value) : "";
     }
     return outputName;
 }
@@ -147,8 +147,8 @@ Bindings * DrvInfo::getMeta()
     if (!attrs) return 0;
     Bindings::iterator a = attrs->find(state->sMeta);
     if (a == attrs->end()) return 0;
-    state->forceAttrs(*a->value, *a->pos);
-    meta = a->value->attrs;
+    state->forceAttrs(*a->second.value, *a->second.pos);
+    meta = a->second.value->attrs;
     return meta;
 }
 
@@ -158,7 +158,7 @@ StringSet DrvInfo::queryMetaNames()
     StringSet res;
     if (!getMeta()) return res;
     for (auto & i : *meta)
-        res.insert(i.name);
+        res.insert(i.second.name);
     return res;
 }
 
@@ -175,7 +175,7 @@ bool DrvInfo::checkMeta(Value & v)
         Bindings::iterator i = v.attrs->find(state->sOutPath);
         if (i != v.attrs->end()) return false;
         for (auto & i : *v.attrs)
-            if (!checkMeta(*i.value)) return false;
+            if (!checkMeta(*i.second.value)) return false;
         return true;
     }
     else return v.type == tInt || v.type == tBool || v.type == tString ||
@@ -187,8 +187,8 @@ Value * DrvInfo::queryMeta(const string & name)
 {
     if (!getMeta()) return 0;
     Bindings::iterator a = meta->find(state->symbols.create(name));
-    if (a == meta->end() || !checkMeta(*a->value)) return 0;
-    return a->value;
+    if (a == meta->end() || !checkMeta(*a->second.value)) return 0;
+    return a->second.value;
 }
 
 
@@ -252,10 +252,9 @@ void DrvInfo::setMeta(const string & name, Value * v)
     Symbol sym = state->symbols.create(name);
     if (old)
         for (auto i : *old)
-            if (i.name != sym)
-                meta->push_back(i);
-    if (v) meta->push_back(Attr(sym, v));
-    meta->sort();
+            if (i.second.name != sym)
+                meta->insert(i);
+    if (v) meta->emplace(sym, Attr(sym, v));
 }
 
 
@@ -336,21 +335,21 @@ static void getDerivations(EvalState & state, Value & vIn,
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        for (auto & i : v.attrs->lexicographicOrder()) {
-            debug("evaluating attribute '%1%'", i->name);
-            if (!std::regex_match(std::string(i->name), attrRegex))
+        for (auto & i : *v.attrs) {
+            debug("evaluating attribute '%1%'", i.second.name);
+            if (!std::regex_match(std::string(i.second.name), attrRegex))
                 continue;
-            string pathPrefix2 = addToPath(pathPrefix, i->name);
+            string pathPrefix2 = addToPath(pathPrefix, i.second.name);
             if (combineChannels)
-                getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
-            else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
+                getDerivations(state, *i.second.value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            else if (getDerivation(state, *i.second.value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
                 /* If the value of this attribute is itself a set,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
-                if (i->value->type == tAttrs) {
-                    Bindings::iterator j = i->value->attrs->find(state.symbols.create("recurseForDerivations"));
-                    if (j != i->value->attrs->end() && state.forceBool(*j->value, *j->pos))
-                        getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                if (i.second.value->type == tAttrs) {
+                    Bindings::iterator j = i.second.value->attrs->find(state.symbols.create("recurseForDerivations"));
+                    if (j != i.second.value->attrs->end() && state.forceBool(*j->second.value, *j->second.pos))
+                        getDerivations(state, *i.second.value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }
         }

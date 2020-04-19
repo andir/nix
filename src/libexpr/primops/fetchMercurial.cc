@@ -23,22 +23,22 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            string n(attr.second.name);
             if (n == "url")
-                url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                url = state.coerceToString(*attr.second.pos, *attr.second.value, context, false, false);
             else if (n == "rev") {
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
-                auto value = state.forceStringNoCtx(*attr.value, *attr.pos);
+                auto value = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
                 if (std::regex_match(value, revRegex))
                     rev = Hash(value, htSHA1);
                 else
                     ref = value;
             }
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
             else
-                throw EvalError("unsupported argument '%s' to 'fetchMercurial', at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchMercurial', at %s", attr.second.name, *attr.second.pos);
         }
 
         if (url.empty())
@@ -76,7 +76,6 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(rev2.gitRev(), 0, 12));
     if (tree.info.revCount)
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *tree.info.revCount);
-    v.attrs->sort();
 
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);

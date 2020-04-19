@@ -1,5 +1,6 @@
 #include "attr-set.hh"
 #include "eval-inline.hh"
+#include "bindings.hh"
 
 #include <algorithm>
 
@@ -12,9 +13,9 @@ namespace nix {
    structure. */
 Bindings * EvalState::allocBindings(size_t capacity)
 {
-    if (capacity > std::numeric_limits<Bindings::size_t>::max())
-        throw Error("attribute set of size %d is too big", capacity);
-    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
+    //if (capacity > std::numeric_limits<Bindings::size_t>::max())
+    //    throw Error("attribute set of size %d is too big", capacity);
+    return new (allocBytes(sizeof(Bindings))) Bindings(/*capacity*/);
 }
 
 
@@ -38,7 +39,7 @@ void EvalState::mkAttrs(Value & v, size_t capacity)
 Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 {
     Value * v = allocValue();
-    vAttrs.attrs->push_back(Attr(name, v));
+    vAttrs.attrs->emplace(name, Attr(name, v));
     return v;
 }
 
@@ -46,12 +47,6 @@ Value * EvalState::allocAttr(Value & vAttrs, const Symbol & name)
 Value * EvalState::allocAttr(Value & vAttrs, const std::string & name)
 {
     return allocAttr(vAttrs, symbols.create(name));
-}
-
-
-void Bindings::sort()
-{
-    std::sort(begin(), end());
 }
 
 

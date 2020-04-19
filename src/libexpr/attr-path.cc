@@ -69,8 +69,8 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
             if (a == v->attrs->end())
                 throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
-            v = &*a->value;
-            pos = *a->pos;
+            v = &(*a->second.value);
+            pos = *(a->second.pos);
         }
 
         else if (apType == apIndex) {

@@ -255,9 +255,9 @@ static void _main(int argc, char * * argv)
         auto newArgs = state->allocBindings(autoArgs->size() + 1);
         auto tru = state->allocValue();
         mkBool(*tru, true);
-        newArgs->push_back(Attr(state->symbols.create("inNixShell"), tru));
-        for (auto & i : *autoArgs) newArgs->push_back(i);
-        newArgs->sort();
+        auto symbol = state->symbols.create("inNixShell");
+        newArgs->emplace(symbol, Attr(symbol, tru));
+        for (auto & i : *autoArgs) newArgs->insert(i);
         autoArgs = newArgs;
     }
 

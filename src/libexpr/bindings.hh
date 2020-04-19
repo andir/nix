@@ -4,5 +4,7 @@
 
 #include "symbol-table.hh"
 
-typedef std::map<Symbol, Attr, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Attr>>> Bindings;
-
+namespace nix {
+    struct Attr;
+    typedef std::map<Symbol, Attr, std::less<Symbol>, gc_allocator<std::pair<const Symbol, Attr>>> Bindings;
+}

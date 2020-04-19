@@ -92,10 +92,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            Symbol symbol = state.symbols.create(j);
+            vMeta.attrs->emplace(symbol, Attr(symbol, v));
         }
-        vMeta.attrs->sort();
-        v.attrs->sort();
 
         if (drvPath != "") references.insert(state.store->parseStorePath(drvPath));
     }
@@ -118,17 +117,17 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     state.mkAttrs(args, 3);
     mkString(*state.allocAttr(args, state.symbols.create("manifest")),
         state.store->printStorePath(manifestFile), {state.store->printStorePath(manifestFile)});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
-    args.attrs->sort();
+    auto symbol = state.symbols.create("derivations");
+    args.attrs->emplace(symbol, Attr(symbol, &manifest));
     mkApp(topLevel, envBuilder, args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
     state.forceValue(topLevel);
     PathSet context;
-    Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
+    Attr & aDrvPath(topLevel.attrs->find(state.sDrvPath)->second);
     auto topLevelDrv = state.store->parseStorePath(state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context));
-    Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
+    Attr & aOutPath(topLevel.attrs->find(state.sOutPath)->second);
     Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
 
     /* Realise the resulting store expression. */

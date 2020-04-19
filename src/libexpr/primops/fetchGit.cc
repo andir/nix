@@ -23,19 +23,19 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            string n(attr.second.name);
             if (n == "url")
-                url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                url = state.coerceToString(*attr.second.pos, *attr.second.value, context, false, false);
             else if (n == "ref")
-                ref = state.forceStringNoCtx(*attr.value, *attr.pos);
+                ref = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
             else if (n == "rev")
-                rev = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA1);
+                rev = Hash(state.forceStringNoCtx(*attr.second.value, *attr.second.pos), htSHA1);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
             else if (n == "submodules")
-                fetchSubmodules = state.forceBool(*attr.value, *attr.pos);
+                fetchSubmodules = state.forceBool(*attr.second.value, *attr.second.pos);
             else
-                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.name, *attr.pos);
+                throw EvalError("unsupported argument '%s' to 'fetchGit', at %s", attr.second.name, *attr.second.pos);
         }
 
         if (url.empty())
@@ -74,7 +74,6 @@ static void prim_fetchGit(EvalState & state, const Pos & pos, Value * * args, Va
     mkInt(*state.allocAttr(v, state.symbols.create("revCount")),
         tree.info.revCount.value_or(0));
     mkBool(*state.allocAttr(v, state.symbols.create("submodules")), fetchSubmodules);
-    v.attrs->sort();
 
     if (state.allowedPaths)
         state.allowedPaths->insert(tree.actualPath);

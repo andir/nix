@@ -360,7 +360,7 @@ StringSet NixRepl::completePrefix(string prefix)
             state->forceAttrs(v);
 
             for (auto & i : *v.attrs) {
-                string name = i.name;
+                string name = i.second.name;
                 if (string(name, 0, cur2.size()) != cur2) continue;
                 completions.insert(prev + expr + "." + name);
             }
@@ -618,7 +618,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
     for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+        addVarToScope(i.second.name, *i.second.value);
     std::cout << format("Added %1% variables.") % attrs.attrs->size() << std::endl;
 }
 
@@ -709,17 +709,18 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
+            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->second.pos, *i->second.value, context) : "???";
             str << drvPath << "»";
         }
 
         else if (maxDepth > 0) {
             str << "{ ";
 
+            // FIXME: now that bindings are a map we could probably remove this
             typedef std::map<string, Value *> Sorted;
             Sorted sorted;
             for (auto & i : *v.attrs)
-                sorted[i.name] = i.value;
+                sorted[i.second.name] = i.second.value;
 
             for (auto & i : sorted) {
                 if (isVarName(i.first))

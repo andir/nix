@@ -119,7 +119,6 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
             outputsVal->listElems()[outputs_index] = state.allocValue();
             mkString(*(outputsVal->listElems()[outputs_index++]), o.first);
         }
-        w.attrs->sort();
 
         static RootValue fun;
         if (!fun) {
@@ -144,8 +143,8 @@ static void prim_scopedImport(EvalState & state, const Pos & pos, Value * * args
 
             unsigned int displ = 0;
             for (auto & attr : *args[0]->attrs) {
-                staticEnv.vars[attr.name] = displ;
-                env->values[displ++] = attr.value;
+                staticEnv.vars[attr.second.name] = displ;
+                env->values[displ++] = attr.second.value;
             }
 
             printTalkative("evaluating file '%1%'", realPath);
@@ -371,18 +370,18 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
         args[0]->attrs->find(state.symbols.create("startSet"));
     if (startSet == args[0]->attrs->end())
         throw EvalError(format("attribute 'startSet' required, at %1%") % pos);
-    state.forceList(*startSet->value, pos);
+    state.forceList(*startSet->second.value, pos);
 
     ValueList workSet;
-    for (unsigned int n = 0; n < startSet->value->listSize(); ++n)
-        workSet.push_back(startSet->value->listElems()[n]);
+    for (unsigned int n = 0; n < startSet->second.value->listSize(); ++n)
+        workSet.push_back(startSet->second.value->listElems()[n]);
 
     /* Get the operator. */
     Bindings::iterator op =
         args[0]->attrs->find(state.symbols.create("operator"));
     if (op == args[0]->attrs->end())
         throw EvalError(format("attribute 'operator' required, at %1%") % pos);
-    state.forceValue(*op->value, pos);
+    state.forceValue(*op->second.value, pos);
 
     /* Construct the closure by applying the operator to element of
        `workSet', adding the result to `workSet', continuing until
@@ -401,14 +400,14 @@ static void prim_genericClosure(EvalState & state, const Pos & pos, Value * * ar
             e->attrs->find(state.symbols.create("key"));
         if (key == e->attrs->end())
             throw EvalError(format("attribute 'key' required, at %1%") % pos);
-        state.forceValue(*key->value, pos);
+        state.forceValue(*key->second.value, pos);
 
-        if (!doneKeys.insert(key->value).second) continue;
+        if (!doneKeys.insert(key->second.value).second) continue;
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
         Value call;
-        mkApp(call, *op->value, *e);
+        mkApp(call, *op->second.value, *e);
         state.forceList(call, pos);
 
         /* Add the values returned by the operator to the work set. */
@@ -462,13 +461,12 @@ static void prim_tryEval(EvalState & state, const Pos & pos, Value * * args, Val
     state.mkAttrs(v, 2);
     try {
         state.forceValue(*args[0], pos);
-        v.attrs->push_back(Attr(state.sValue, args[0]));
+        v.attrs->emplace(state.sValue, Attr(state.sValue, args[0]));
         mkBool(*state.allocAttr(v, state.symbols.create("success")), true);
     } catch (AssertionError & e) {
         mkBool(*state.allocAttr(v, state.sValue), false);
         mkBool(*state.allocAttr(v, state.symbols.create("success")), false);
     }
-    v.attrs->sort();
 }
 
 
@@ -534,9 +532,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     if (attr == args[0]->attrs->end())
         throw EvalError(format("required attribute 'name' missing, at %1%") % pos);
     string drvName;
-    Pos & posDrvName(*attr->pos);
+    Pos & posDrvName(*attr->second.pos);
     try {
-        drvName = state.forceStringNoCtx(*attr->value, pos);
+        drvName = state.forceStringNoCtx(*attr->second.value, pos);
     } catch (Error & e) {
         e.addPrefix(format("while evaluating the derivation attribute 'name' at %1%:\n") % posDrvName);
         throw;
@@ -546,14 +544,14 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     std::ostringstream jsonBuf;
     std::unique_ptr<JSONObject> jsonObject;
     attr = args[0]->attrs->find(state.sStructuredAttrs);
-    if (attr != args[0]->attrs->end() && state.forceBool(*attr->value, pos))
+    if (attr != args[0]->attrs->end() && state.forceBool(*attr->second.value, pos))
         jsonObject = std::make_unique<JSONObject>(jsonBuf);
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
     attr = args[0]->attrs->find(state.sIgnoreNulls);
     if (attr != args[0]->attrs->end())
-        ignoreNulls = state.forceBool(*attr->value, pos);
+        ignoreNulls = state.forceBool(*attr->second.value, pos);
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
@@ -567,9 +565,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
     StringSet outputs;
     outputs.insert("out");
 
-    for (auto & i : args[0]->attrs->lexicographicOrder()) {
-        if (i->name == state.sIgnoreNulls) continue;
-        const string & key = i->name;
+    for (auto & i : *args[0]->attrs) {
+        if (i.second.name == state.sIgnoreNulls) continue;
+        const string & key = i.second.name;
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string & s) {
@@ -599,16 +597,16 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         try {
 
             if (ignoreNulls) {
-                state.forceValue(*i->value, pos);
-                if (i->value->type == tNull) continue;
+                state.forceValue(*i.second.value, pos);
+                if (i.second.value->type == tNull) continue;
             }
 
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            if (i->name == state.sArgs) {
-                state.forceList(*i->value, pos);
-                for (unsigned int n = 0; n < i->value->listSize(); ++n) {
-                    string s = state.coerceToString(posDrvName, *i->value->listElems()[n], context, true);
+            if (i.second.name == state.sArgs) {
+                state.forceList(*i.second.value, pos);
+                for (unsigned int n = 0; n < i.second.value->listSize(); ++n) {
+                    string s = state.coerceToString(posDrvName, *i.second.value->listElems()[n], context, true);
                     drv.args.push_back(s);
                 }
             }
@@ -619,39 +617,39 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
                 if (jsonObject) {
 
-                    if (i->name == state.sStructuredAttrs) continue;
+                    if (i.second.name == state.sStructuredAttrs) continue;
 
                     auto placeholder(jsonObject->placeholder(key));
-                    printValueAsJSON(state, true, *i->value, placeholder, context);
+                    printValueAsJSON(state, true, *i.second.value, placeholder, context);
 
-                    if (i->name == state.sBuilder)
-                        drv.builder = state.forceString(*i->value, context, posDrvName);
-                    else if (i->name == state.sSystem)
-                        drv.platform = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sOutputHash)
-                        outputHash = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = state.forceStringNoCtx(*i->value, posDrvName);
-                    else if (i->name == state.sOutputHashMode)
-                        handleHashMode(state.forceStringNoCtx(*i->value, posDrvName));
-                    else if (i->name == state.sOutputs) {
+                    if (i.second.name == state.sBuilder)
+                        drv.builder = state.forceString(*i.second.value, context, posDrvName);
+                    else if (i.second.name == state.sSystem)
+                        drv.platform = state.forceStringNoCtx(*i.second.value, posDrvName);
+                    else if (i.second.name == state.sOutputHash)
+                        outputHash = state.forceStringNoCtx(*i.second.value, posDrvName);
+                    else if (i.second.name == state.sOutputHashAlgo)
+                        outputHashAlgo = state.forceStringNoCtx(*i.second.value, posDrvName);
+                    else if (i.second.name == state.sOutputHashMode)
+                        handleHashMode(state.forceStringNoCtx(*i.second.value, posDrvName));
+                    else if (i.second.name == state.sOutputs) {
                         /* Require ‘outputs’ to be a list of strings. */
-                        state.forceList(*i->value, posDrvName);
+                        state.forceList(*i.second.value, posDrvName);
                         Strings ss;
-                        for (unsigned int n = 0; n < i->value->listSize(); ++n)
-                            ss.emplace_back(state.forceStringNoCtx(*i->value->listElems()[n], posDrvName));
+                        for (unsigned int n = 0; n < i.second.value->listSize(); ++n)
+                            ss.emplace_back(state.forceStringNoCtx(*i.second.value->listElems()[n], posDrvName));
                         handleOutputs(ss);
                     }
 
                 } else {
-                    auto s = state.coerceToString(posDrvName, *i->value, context, true);
+                    auto s = state.coerceToString(posDrvName, *i.second.value, context, true);
                     drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder) drv.builder = s;
-                    else if (i->name == state.sSystem) drv.platform = s;
-                    else if (i->name == state.sOutputHash) outputHash = s;
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = s;
-                    else if (i->name == state.sOutputHashMode) handleHashMode(s);
-                    else if (i->name == state.sOutputs)
+                    if (i.second.name == state.sBuilder) drv.builder = s;
+                    else if (i.second.name == state.sSystem) drv.platform = s;
+                    else if (i.second.name == state.sOutputHash) outputHash = s;
+                    else if (i.second.name == state.sOutputHashAlgo) outputHashAlgo = s;
+                    else if (i.second.name == state.sOutputHashMode) handleHashMode(s);
+                    else if (i.second.name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
                 }
 
@@ -769,7 +767,6 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         mkString(*state.allocAttr(v, state.symbols.create(i.first)),
             state.store->printStorePath(i.second.path), {"!" + i.first + "!" + drvPathS});
     }
-    v.attrs->sort();
 }
 
 
@@ -903,14 +900,14 @@ static void prim_findFile(EvalState & state, const Pos & pos, Value * * args, Va
         string prefix;
         Bindings::iterator i = v2.attrs->find(state.symbols.create("prefix"));
         if (i != v2.attrs->end())
-            prefix = state.forceStringNoCtx(*i->value, pos);
+            prefix = state.forceStringNoCtx(*i->second.value, pos);
 
         i = v2.attrs->find(state.symbols.create("path"));
         if (i == v2.attrs->end())
             throw EvalError(format("attribute 'path' missing, at %1%") % pos);
 
         PathSet context;
-        string path = state.coerceToString(pos, *i->value, context, false, false);
+        string path = state.coerceToString(pos, *i->second.value, context, false, false);
 
         try {
             state.realiseContext(context);
@@ -966,8 +963,6 @@ static void prim_readDir(EvalState & state, const Pos & pos, Value * * args, Val
             ent.type == DT_LNK ? "symlink" :
             "unknown");
     }
-
-    v.attrs->sort();
 }
 
 
@@ -1109,23 +1104,23 @@ static void prim_path(EvalState & state, const Pos & pos, Value * * args, Value 
     Hash expectedHash;
 
     for (auto & attr : *args[0]->attrs) {
-        const string & n(attr.name);
+        const string & n(attr.second.name);
         if (n == "path") {
             PathSet context;
-            path = state.coerceToPath(*attr.pos, *attr.value, context);
+            path = state.coerceToPath(*attr.second.pos, *attr.second.value, context);
             if (!context.empty())
-                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.pos);
-        } else if (attr.name == state.sName)
-            name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                throw EvalError(format("string '%1%' cannot refer to other paths, at %2%") % path % *attr.second.pos);
+        } else if (attr.second.name == state.sName)
+            name = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
         else if (n == "filter") {
-            state.forceValue(*attr.value, pos);
-            filterFun = attr.value;
+            state.forceValue(*attr.second.value, pos);
+            filterFun = attr.second.value;
         } else if (n == "recursive")
-            recursive = state.forceBool(*attr.value, *attr.pos);
+            recursive = state.forceBool(*attr.second.value, *attr.second.pos);
         else if (n == "sha256")
-            expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+            expectedHash = Hash(state.forceStringNoCtx(*attr.second.value, *attr.second.pos), htSHA256);
         else
-            throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.name % *attr.pos);
+            throw EvalError(format("unsupported argument '%1%' to 'addPath', at %2%") % attr.second.name % *attr.second.pos);
     }
     if (path.empty())
         throw EvalError(format("'path' required, at %1%") % pos);
@@ -1151,7 +1146,7 @@ static void prim_attrNames(EvalState & state, const Pos & pos, Value * * args, V
 
     size_t n = 0;
     for (auto & i : *args[0]->attrs)
-        mkString(*(v.listElems()[n++] = state.allocValue()), i.name);
+        mkString(*(v.listElems()[n++] = state.allocValue()), i.second.name);
 
     std::sort(v.listElems(), v.listElems() + n,
               [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
@@ -1168,13 +1163,7 @@ static void prim_attrValues(EvalState & state, const Pos & pos, Value * * args, 
 
     unsigned int n = 0;
     for (auto & i : *args[0]->attrs)
-        v.listElems()[n++] = (Value *) &i;
-
-    std::sort(v.listElems(), v.listElems() + n,
-        [](Value * v1, Value * v2) { return (string) ((Attr *) v1)->name < (string) ((Attr *) v2)->name; });
-
-    for (unsigned int i = 0; i < n; ++i)
-        v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
+        v.listElems()[n++] = i.second.value;
 }
 
 
@@ -1188,9 +1177,9 @@ void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v)
     if (i == args[1]->attrs->end())
         throw EvalError(format("attribute '%1%' missing, at %2%") % attr % pos);
     // !!! add to stack trace?
-    if (state.countCalls && i->pos) state.attrSelects[*i->pos]++;
-    state.forceValue(*i->value, pos);
-    v = *i->value;
+    if (state.countCalls && i->second.pos) state.attrSelects[*i->second.pos]++;
+    state.forceValue(*i->second.value, pos);
+    v = *i->second.value;
 }
 
 
@@ -1203,7 +1192,7 @@ void prim_unsafeGetAttrPos(EvalState & state, const Pos & pos, Value * * args, V
     if (i == args[1]->attrs->end())
         mkNull(v);
     else
-        state.mkPos(v, i->pos);
+        state.mkPos(v, i->second.pos);
 }
 
 
@@ -1241,8 +1230,8 @@ static void prim_removeAttrs(EvalState & state, const Pos & pos, Value * * args,
        vector. */
     state.mkAttrs(v, args[0]->attrs->size());
     for (auto & i : *args[0]->attrs) {
-        if (names.find(i.name) == names.end())
-            v.attrs->push_back(i);
+        if (names.find(i.second.name) == names.end())
+            v.attrs->insert(i);
     }
 }
 
@@ -1267,7 +1256,7 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
         Bindings::iterator j = v2.attrs->find(state.sName);
         if (j == v2.attrs->end())
             throw TypeError(format("'name' attribute missing in a call to 'listToAttrs', at %1%") % pos);
-        string name = state.forceStringNoCtx(*j->value, pos);
+        string name = state.forceStringNoCtx(*j->second.value, pos);
 
         Symbol sym = state.symbols.create(name);
         if (seen.insert(sym).second) {
@@ -1275,11 +1264,9 @@ static void prim_listToAttrs(EvalState & state, const Pos & pos, Value * * args,
             if (j2 == v2.attrs->end())
                 throw TypeError(format("'value' attribute missing in a call to 'listToAttrs', at %1%") % pos);
 
-            v.attrs->push_back(Attr(sym, j2->value, j2->pos));
+            v.attrs->emplace(sym, Attr(sym, j2->second.value, j2->second.pos));
         }
     }
-
-    v.attrs->sort();
 }
 
 
@@ -1294,9 +1281,9 @@ static void prim_intersectAttrs(EvalState & state, const Pos & pos, Value * * ar
     state.mkAttrs(v, std::min(args[0]->attrs->size(), args[1]->attrs->size()));
 
     for (auto & i : *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i.name);
+        Bindings::iterator j = args[1]->attrs->find(i.second.name);
         if (j != args[1]->attrs->end())
-            v.attrs->push_back(*j);
+            v.attrs->insert(*j);
     }
 }
 
@@ -1321,7 +1308,7 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
         state.forceAttrs(v2, pos);
         Bindings::iterator i = v2.attrs->find(attrName);
         if (i != v2.attrs->end())
-            res[found++] = i->value;
+            res[found++] = i->second.value;
     }
 
     state.mkList(v, found);
@@ -1358,10 +1345,9 @@ static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args
     for (auto & i : args[0]->lambda.fun->formals->formals) {
         // !!! should optimise booleans (allocate only once)
         Value * value = state.allocValue();
-        v.attrs->push_back(Attr(i.name, value, &i.pos));
+        v.attrs->emplace(i.name, Attr(i.name, value, &i.pos));
         mkBool(*value, i.def);
     }
-    v.attrs->sort();
 }
 
 
@@ -1375,9 +1361,9 @@ static void prim_mapAttrs(EvalState & state, const Pos & pos, Value * * args, Va
     for (auto & i : *args[1]->attrs) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
-        mkString(*vName, i.name);
+        mkString(*vName, i.second.name);
         mkApp(*vFun2, *args[0], *vName);
-        mkApp(*state.allocAttr(v, i.name), *vFun2, *i.value);
+        mkApp(*state.allocAttr(v, i.second.name), *vFun2, *i.second.value);
     }
 }
 
@@ -1648,8 +1634,6 @@ static void prim_partition(EvalState & state, const Pos & pos, Value * * args, V
     state.mkList(*vWrong, wsize);
     if (wsize)
         memcpy(vWrong->listElems(), wrong.data(), sizeof(Value *) * wsize);
-
-    v.attrs->sort();
 }
 
 
@@ -2017,7 +2001,6 @@ static void prim_parseDrvName(EvalState & state, const Pos & pos, Value * * args
     state.mkAttrs(v, 2);
     mkString(*state.allocAttr(v, state.sName), parsed.name);
     mkString(*state.allocAttr(v, state.symbols.create("version")), parsed.version);
-    v.attrs->sort();
 }
 
 
@@ -2246,7 +2229,6 @@ void EvalState::createBaseEnv()
         mkAttrs(*v2, 2);
         mkString(*allocAttr(*v2, symbols.create("path")), i.second);
         mkString(*allocAttr(*v2, symbols.create("prefix")), i.first);
-        v2->attrs->sort();
     }
     addConstant("__nixPath", v);
 
@@ -2256,7 +2238,6 @@ void EvalState::createBaseEnv()
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
-    baseEnv.values[0]->attrs->sort();
 }
 
 

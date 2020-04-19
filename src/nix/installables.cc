@@ -66,8 +66,6 @@ Value * SourceExprCommand::getSourceExpr(EvalState & state)
                         addEntry(j.name);
             } else
                 addEntry(i.first);
-
-        (*vSourceExpr)->attrs->sort();
     }
 
     return *vSourceExpr;

@@ -40,7 +40,7 @@ class JSONSax : nlohmann::json_sax<json> {
             Value & v = parent->value(state);
             state.mkAttrs(v, attrs.size());
             for (auto & i : attrs)
-                v.attrs->push_back(Attr(i.first, i.second));
+                v.attrs->emplace(i.first, Attr(i.first, i.second));
             return std::move(parent);
         }
         void add() override { v = nullptr; }

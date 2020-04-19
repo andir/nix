@@ -39,9 +39,9 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
             state.mkThunk_(*v, state.parseExprFromString(string(i.second, 1), absPath(".")));
         else
             mkString(*v, string(i.second, 1));
-        res->push_back(Attr(state.symbols.create(i.first), v));
+        auto symbol = state.symbols.create(i.first);
+        res->emplace(symbol, Attr(symbol, v));
     }
-    res->sort();
     return res;
 }
 

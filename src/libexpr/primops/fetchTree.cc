@@ -36,8 +36,6 @@ void emitTreeAttrs(
     if (tree.info.lastModified)
         mkString(*state.allocAttr(v, state.symbols.create("lastModified")),
             fmt("%s", std::put_time(std::gmtime(&*tree.info.lastModified), "%Y%m%d%H%M%S")));
-
-    v.attrs->sort();
 }
 
 static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
@@ -55,14 +53,14 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
         fetchers::Attrs attrs;
 
         for (auto & attr : *args[0]->attrs) {
-            state.forceValue(*attr.value);
-            if (attr.value->type == tString)
-                attrs.emplace(attr.name, attr.value->string.s);
-            else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, attr.value->boolean);
+            state.forceValue(*attr.second.value);
+            if (attr.second.value->type == tString)
+                attrs.emplace(attr.second.name, attr.second.value->string.s);
+            else if (attr.second.value->type == tBool)
+                attrs.emplace(attr.second.name, attr.second.value->boolean);
             else
                 throw TypeError("fetchTree argument '%s' is %s while a string or Boolean is expected",
-                    attr.name, showType(*attr.value));
+                    attr.second.name, showType(*attr.second.value));
         }
 
         if (!attrs.count("type"))
@@ -99,16 +97,16 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            string n(attr.second.name);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                url = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
             else if (n == "sha256")
-                expectedHash = Hash(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = Hash(state.forceStringNoCtx(*attr.second.value, *attr.second.pos), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.second.value, *attr.second.pos);
             else
                 throw EvalError("unsupported argument '%s' to '%s', at %s",
-                    attr.name, who, attr.pos);
+                    attr.second.name, who, attr.second.pos);
         }
 
         if (!url)

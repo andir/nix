@@ -38,12 +38,12 @@ string resolveMirrorUri(EvalState & state, string uri)
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
     if (mirrorList == vMirrors.attrs->end())
         throw Error(format("unknown mirror name '%1%'") % mirrorName);
-    state.forceList(*mirrorList->value);
+    state.forceList(*mirrorList->second.value);
 
-    if (mirrorList->value->listSize() < 1)
+    if (mirrorList->second.value->listSize() < 1)
         throw Error(format("mirror URI '%1%' did not expand to anything") % uri);
 
-    string mirror = state.forceString(*mirrorList->value->listElems()[0]);
+    string mirror = state.forceString(*mirrorList->second.value->listElems()[0]);
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + string(s, p + 1);
 }
 
@@ -127,23 +127,23 @@ static int _main(int argc, char * * argv)
             auto attr = v.attrs->find(state->symbols.create("urls"));
             if (attr == v.attrs->end())
                 throw Error("attribute set does not contain a 'urls' attribute");
-            state->forceList(*attr->value);
-            if (attr->value->listSize() < 1)
+            state->forceList(*attr->second.value);
+            if (attr->second.value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            uri = state->forceString(*attr->value->listElems()[0]);
+            uri = state->forceString(*attr->second.value->listElems()[0]);
 
             /* Extract the hash mode. */
             attr = v.attrs->find(state->symbols.create("outputHashMode"));
             if (attr == v.attrs->end())
                 printInfo("warning: this does not look like a fetchurl call");
             else
-                unpack = state->forceString(*attr->value) == "recursive";
+                unpack = state->forceString(*attr->second.value) == "recursive";
 
             /* Extract the name. */
             if (name.empty()) {
                 attr = v.attrs->find(state->symbols.create("name"));
                 if (attr != v.attrs->end())
-                    name = state->forceString(*attr->value);
+                    name = state->forceString(*attr->second.value);
             }
         }
 
