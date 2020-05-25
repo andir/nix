@@ -120,7 +120,7 @@ private:
 
 public:
 
-    EvalState(const Strings & _searchPath, ref<Store> store);
+    EvalState(const Strings & _searchPath, ref<Store> store, bool addCorepkgsToNixPath = true);
     ~EvalState();
 
     void addToSearchPath(const string & s);
@@ -230,7 +230,7 @@ private:
 
     unsigned int baseEnvDispl = 0;
 
-    void createBaseEnv();
+    void createBaseEnv(bool addCorepkgsToNixPath = true);
 
     Value * addConstant(const string & name, Value & v);
 

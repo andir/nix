@@ -297,7 +297,7 @@ static Strings parseNixPath(const string & s)
 }
 
 
-EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
+EvalState::EvalState(const Strings & _searchPath, ref<Store> store, bool addCorepkgsToNixPath)
     : sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -339,7 +339,9 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
     }
-    addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
+
+    if (addCorepkgsToNixPath)
+        addToSearchPath("nix=" + canonPath(settings.nixDataDir + "/nix/corepkgs", true));
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
@@ -364,7 +366,7 @@ EvalState::EvalState(const Strings & _searchPath, ref<Store> store)
     vEmptySet.type = tAttrs;
     vEmptySet.attrs = allocBindings(0);
 
-    createBaseEnv();
+    createBaseEnv(addCorepkgsToNixPath);
 }
 
 

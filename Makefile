@@ -8,6 +8,7 @@ makefiles = \
   src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
+  src/libexpr/tests/local.mk \
   src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
@@ -15,9 +16,9 @@ makefiles = \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
-  doc/manual/local.mk \
-  tests/local.mk \
-  tests/plugins/local.mk
+  doc/manual/local.mk
+#  tests/local.mk \
+#  tests/plugins/local.mk
 
 -include Makefile.config
 

@@ -2064,7 +2064,7 @@ RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
 }
 
 
-void EvalState::createBaseEnv()
+void EvalState::createBaseEnv(bool addCorepkgsToNixPath)
 {
     baseEnv.up = 0;
 
@@ -2233,10 +2233,12 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
-    sDerivationNix = symbols.create(path);
-    evalFile(path, v);
-    addConstant("derivation", v);
+    if (addCorepkgsToNixPath) {
+        string path = canonPath(settings.nixDataDir + "/nix/corepkgs/derivation.nix", true);
+        sDerivationNix = symbols.create(path);
+        evalFile(path, v);
+        addConstant("derivation", v);
+    }
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());
